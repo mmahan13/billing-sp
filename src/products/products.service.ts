@@ -1,7 +1,7 @@
 import {
   BadRequestException,
-  ConflictException,
   Injectable,
+  InternalServerErrorException,
   Logger,
   NotFoundException,
 } from '@nestjs/common';
@@ -27,17 +27,9 @@ export class ProductsService {
   async create(createProductDto: CreateProductDto): Promise<Product> {
     const { taxId, productName, ...productDetails } = createProductDto;
 
-    // 1. Comprobamos si el nompre del producto ya existe para evitar duplicados
-    const existingProduct = await this.productRepository.findOneBy({
-      productName,
-    });
-    if (existingProduct) {
-      throw new ConflictException(
-        `El producto con el nombre "${productName}" ya existe.`,
-      );
-    }
+    const normalizedName = productName.toUpperCase().trim();
 
-    //Verificamos que el impuesto existe
+    // 1. Verificamos el impuesto (Esto lo mantenemos para dar un 404 claro si falla)
     const tax = await this.taxRepository.findOneBy({ id: taxId });
     if (!tax) {
       throw new NotFoundException(
@@ -45,15 +37,19 @@ export class ProductsService {
       );
     }
 
-    // 2. Creamos el producto enlazando la relación
+    // 2. Preparamos el producto
     const product = this.productRepository.create({
       ...productDetails,
-      productName,
-      tax: tax, // Asociamos la entidad del impuesto
+      productName: normalizedName,
+      tax: tax,
     });
 
-    // 3. Guardamos en PostgreSQL
-    return await this.productRepository.save(product);
+    // 3. Guardamos delegando los errores de duplicados (23505) a tu manejador central
+    try {
+      return await this.productRepository.save(product);
+    } catch (error) {
+      this.handlerDBExceptions(error);
+    }
   }
 
   async update(
@@ -75,7 +71,11 @@ export class ProductsService {
       product.tax = tax;
     }
 
-    return await this.productRepository.save(product);
+    try {
+      return await this.productRepository.save(product);
+    } catch (error) {
+      this.handlerDBExceptions(error);
+    }
   }
 
   async findOne(id: string): Promise<Product> {
@@ -113,6 +113,8 @@ export class ProductsService {
       throw new BadRequestException(error.detail);
     }
     this.looger.error(error);
-    throw new NotFoundException('Unexpected error, check server logs');
+    throw new InternalServerErrorException(
+      'Unexpected error, check server logs',
+    );
   }
 }
