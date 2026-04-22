@@ -5,10 +5,14 @@ import {
   IsPositive,
   IsOptional,
   IsUUID,
+  MinLength,
 } from 'class-validator';
 
 export class CreateProductDto {
   @IsString()
+  @MinLength(3, {
+    message: 'El nombre del producto debe tener al menos 3 caracteres',
+  })
   @IsNotEmpty({ message: 'El nombre del producto es obligatorio' })
   name: string;
 
@@ -21,8 +25,7 @@ export class CreateProductDto {
   @IsOptional()
   description?: string;
 
-  // Pedimos explícitamente el ID del impuesto (debe ser un UUID válido)
-  @IsUUID('4', { message: 'El ID del impuesto no tiene un formato válido' })
+  @IsUUID()
   @IsNotEmpty({ message: 'Debes seleccionar un tipo de impuesto' })
   taxId: string;
 }

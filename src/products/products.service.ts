@@ -19,7 +19,7 @@ export class ProductsService {
   async create(createProductDto: CreateProductDto): Promise<Product> {
     const { taxId, ...productDetails } = createProductDto;
 
-    // 1. Verificamos que el impuesto existe
+    //Verificamos que el impuesto existe
     const tax = await this.taxRepository.findOneBy({ id: taxId });
     if (!tax) {
       throw new NotFoundException(
