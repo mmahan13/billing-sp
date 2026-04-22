@@ -3,13 +3,13 @@ import { CreateTaxDto } from './dto/create-tax.dto';
 import { UpdateTaxDto } from './dto/update-tax.dto';
 
 @Injectable()
-export class TaxService {
+export class TaxesService {
   create(createTaxDto: CreateTaxDto) {
     return 'This action adds a new tax';
   }
 
   findAll() {
-    return `This action returns all tax`;
+    return `This action returns all taxes`;
   }
 
   findOne(id: number) {

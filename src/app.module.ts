@@ -4,17 +4,18 @@ import { ClientsModule } from './clients/clients.module';
 import { ProductsModule } from './products/products.module';
 import { OrdersModule } from './orders/orders.module';
 import { InvoicesModule } from './invoices/invoices.module';
-import { TaxModule } from './tax/tax.module';
 import { ConfigModule } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { TaxesModule } from './taxes/taxes.module';
+import { AuxiliaryModule } from './auxiliary/auxiliary.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot(),
     TypeOrmModule.forRoot({
       type: 'postgres',
-      host: process.env.BD_HOST,
-      port: process.env.BD_PORT ? parseInt(process.env.BD_PORT) : 5432,
+      host: process.env.DB_HOST,
+      port: process.env.DB_PORT ? parseInt(process.env.DB_PORT) : 5432,
       username: process.env.DB_USER,
       password: process.env.DB_PASSWORD,
       database: process.env.DB_NAME,
@@ -26,7 +27,8 @@ import { TypeOrmModule } from '@nestjs/typeorm';
     ProductsModule,
     OrdersModule,
     InvoicesModule,
-    TaxModule,
+    TaxesModule,
+    AuxiliaryModule,
   ],
   controllers: [],
   providers: [],
