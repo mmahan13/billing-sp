@@ -14,7 +14,7 @@ export class CreateProductDto {
     message: 'El nombre del producto debe tener al menos 3 caracteres',
   })
   @IsNotEmpty({ message: 'El nombre del producto es obligatorio' })
-  name: string;
+  productName: string;
 
   @IsNumber()
   @IsPositive({ message: 'El precio base debe ser un número positivo' })

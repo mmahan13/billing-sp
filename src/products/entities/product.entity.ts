@@ -8,6 +8,8 @@ import {
   CreateDateColumn,
   UpdateDateColumn,
   DeleteDateColumn,
+  BeforeInsert,
+  BeforeUpdate,
 } from 'typeorm';
 
 @Entity('products')
@@ -15,8 +17,8 @@ export class Product {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column('text', { nullable: false })
-  name: string;
+  @Column('text', { name: 'product_name', nullable: false, unique: true })
+  productName: string;
 
   @Column('decimal', { precision: 10, scale: 2 })
   basePrice: number;
@@ -44,4 +46,12 @@ export class Product {
   //Soft Delete nativo de TypeORM
   @DeleteDateColumn({ type: 'timestamptz', name: 'deleted_at' })
   deletedAt: Date;
+
+  @BeforeInsert()
+  @BeforeUpdate()
+  upperCaseName() {
+    if (this.productName) {
+      this.productName = this.productName.toUpperCase();
+    }
+  }
 }
