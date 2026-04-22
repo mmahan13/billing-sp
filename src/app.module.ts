@@ -8,6 +8,7 @@ import { ConfigModule } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { TaxesModule } from './taxes/taxes.module';
 import { AuxiliaryModule } from './auxiliary/auxiliary.module';
+import { CommonModule } from './common/common.module';
 
 @Module({
   imports: [
@@ -29,6 +30,7 @@ import { AuxiliaryModule } from './auxiliary/auxiliary.module';
     InvoicesModule,
     TaxesModule,
     AuxiliaryModule,
+    CommonModule,
   ],
   controllers: [],
   providers: [],
