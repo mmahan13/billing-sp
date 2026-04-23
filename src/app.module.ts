@@ -1,5 +1,4 @@
 import { Module } from '@nestjs/common';
-import { UsersModule } from './users/users.module';
 import { ClientsModule } from './clients/clients.module';
 import { ProductsModule } from './products/products.module';
 import { OrdersModule } from './orders/orders.module';
@@ -25,7 +24,6 @@ import { CompanyModule } from './company/company.module';
       autoLoadEntities: true, //carga las entidades en la bd que se crean
       synchronize: true, //Solo en dev en pro no se usa.
     }),
-    UsersModule,
     ClientsModule,
     ProductsModule,
     OrdersModule,
