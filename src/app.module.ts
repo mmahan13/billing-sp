@@ -9,6 +9,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { TaxesModule } from './taxes/taxes.module';
 import { AuxiliaryModule } from './auxiliary/auxiliary.module';
 import { CommonModule } from './common/common.module';
+import { AuthModule } from './auth/auth.module';
 
 @Module({
   imports: [
@@ -31,6 +32,7 @@ import { CommonModule } from './common/common.module';
     TaxesModule,
     AuxiliaryModule,
     CommonModule,
+    AuthModule,
   ],
   controllers: [],
   providers: [],
