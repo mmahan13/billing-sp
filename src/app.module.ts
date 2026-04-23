@@ -10,6 +10,7 @@ import { TaxesModule } from './taxes/taxes.module';
 import { AuxiliaryModule } from './auxiliary/auxiliary.module';
 import { CommonModule } from './common/common.module';
 import { AuthModule } from './auth/auth.module';
+import { CompanyModule } from './company/company.module';
 
 @Module({
   imports: [
@@ -33,6 +34,7 @@ import { AuthModule } from './auth/auth.module';
     AuxiliaryModule,
     CommonModule,
     AuthModule,
+    CompanyModule,
   ],
   controllers: [],
   providers: [],

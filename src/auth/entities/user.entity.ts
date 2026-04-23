@@ -2,10 +2,12 @@ import {
   Column,
   CreateDateColumn,
   Entity,
+  OneToOne,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
 import { UserRole } from '../enums/user-role.enum';
+import { Company } from 'src/company/entities/company.entity';
 
 @Entity('users')
 export class User {
@@ -31,6 +33,9 @@ export class User {
 
   @Column('boolean', { default: true })
   isActive: boolean;
+
+  @OneToOne(() => Company, (company) => company.owner)
+  company: Company;
 
   @CreateDateColumn({
     name: 'created_at',
