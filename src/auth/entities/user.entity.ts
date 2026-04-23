@@ -18,7 +18,7 @@ export class User {
   @Column('text', { unique: true, nullable: false })
   email: string;
 
-  @Column('text', { nullable: false })
+  @Column('text', { select: false, nullable: false })
   password: string;
 
   @Column({

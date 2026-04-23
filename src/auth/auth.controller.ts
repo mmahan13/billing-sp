@@ -12,9 +12,10 @@ export class AuthController {
     return this.authService.create(createUserDto);
   }
 
- /*  @Post('login')
+  @Post('login')
   @HttpCode(HttpStatus.OK)
   login(@Body() loginUserDto: LoginUserDto): Promise<LoginResponse> {
+    console.log(loginUserDto);
     return this.authService.login(loginUserDto);
-  } */
+  }
 }
