@@ -75,7 +75,7 @@ export class ProductsService {
       }
       product.tax = tax;
     }
-    product.user = user;
+    product.updatedBy = user.id;
 
     try {
       return await this.productRepository.save(product);
