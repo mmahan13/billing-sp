@@ -12,10 +12,12 @@ import { CreateProductDto } from './dto/create-product.dto';
 import { Tax } from '../taxes/entities/tax.entity'; // Asegúrate de que la ruta coincida
 import { UpdateProductDto } from './dto/update-product.dto';
 import { PaginationDto } from 'src/common/dto/pagination.dto';
+import { User } from 'src/auth/entities/user.entity';
+import { PaginatedResponse } from 'src/interfaces/paginate-response.model';
 
 @Injectable()
 export class ProductsService {
-  private readonly looger = new Logger('ProductsService');
+  private readonly logger = new Logger('ProductsService');
   constructor(
     @InjectRepository(Product)
     private readonly productRepository: Repository<Product>,
@@ -24,7 +26,10 @@ export class ProductsService {
     private readonly taxRepository: Repository<Tax>,
   ) {}
 
-  async create(createProductDto: CreateProductDto): Promise<Product> {
+  async create(
+    createProductDto: CreateProductDto,
+    user: User,
+  ): Promise<Product> {
     const { taxId, productName, ...productDetails } = createProductDto;
 
     const normalizedName = productName.toUpperCase().trim();
@@ -41,10 +46,9 @@ export class ProductsService {
     const product = this.productRepository.create({
       ...productDetails,
       productName: normalizedName,
+      user,
       tax: tax,
     });
-
-    // 3. Guardamos delegando los errores de duplicados (23505) a tu manejador central
     try {
       return await this.productRepository.save(product);
     } catch (error) {
@@ -55,9 +59,10 @@ export class ProductsService {
   async update(
     id: string,
     updateProductDto: UpdateProductDto,
+    user: User,
   ): Promise<Product> {
     const { taxId, ...baseData } = updateProductDto;
-    const product = await this.findOne(id);
+    const product = await this.findOne(id, user);
 
     this.productRepository.merge(product, baseData);
 
@@ -70,6 +75,7 @@ export class ProductsService {
       }
       product.tax = tax;
     }
+    product.user = user;
 
     try {
       return await this.productRepository.save(product);
@@ -78,26 +84,53 @@ export class ProductsService {
     }
   }
 
-  async findOne(id: string): Promise<Product> {
-    const product = await this.productRepository.findOneBy({ id });
+  async findOne(id: string, user: User): Promise<Product> {
+    const product = await this.productRepository.findOne({
+      where: {
+        id: id,
+        user: { id: user.id },
+      },
+    });
     if (!product) {
       throw new NotFoundException(`El producto con ID ${id} no existe`);
     }
     return product;
   }
 
-  async findAll(paginationDto: PaginationDto): Promise<Product[]> {
+  async findAll(
+    paginationDto: PaginationDto,
+    user: User,
+  ): Promise<PaginatedResponse<Product>> {
     const { page = 1, limit = 10 } = paginationDto;
-
     const skip = (page - 1) * limit;
-    return await this.productRepository.find({
+
+    // findAndCount devuelve un array con 2 posiciones: [losDatos, elTotalDeRegistros]
+    const [products, total] = await this.productRepository.findAndCount({
       skip,
       take: limit,
+      where: {
+        user: { id: user.id },
+      },
+      order: {
+        createdAt: 'DESC', // Opcional: Para que salgan los más recientes primero
+      },
     });
+
+    // Devolvemos un objeto con la metadata útil para el frontend
+    return {
+      data: products,
+      meta: {
+        totalItems: total,
+        itemCount: products.length,
+        itemsPerPage: limit,
+        totalPages: Math.ceil(total / limit),
+        currentPage: page,
+      },
+    };
   }
 
-  async remove(id: string): Promise<void> {
-    await this.findOne(id);
+  async remove(id: string, user: User): Promise<void> {
+    await this.findOne(id, user);
     await this.productRepository.softDelete(id);
   }
 
@@ -112,7 +145,7 @@ export class ProductsService {
       // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
       throw new BadRequestException(error.detail);
     }
-    this.looger.error(error);
+    this.logger.error(error);
     throw new InternalServerErrorException(
       'Unexpected error, check server logs',
     );
