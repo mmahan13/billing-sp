@@ -4,12 +4,14 @@ import {
   Column,
   CreateDateColumn,
   Entity,
+  OneToMany,
   OneToOne,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
 import { UserRole } from '../enums/user-role.enum';
 import { Company } from 'src/company/entities/company.entity';
+import { Product } from 'src/products/entities/product.entity';
 
 @Entity('users')
 export class User {
@@ -35,6 +37,10 @@ export class User {
 
   @Column('boolean', { default: true })
   isActive: boolean;
+
+  //relaciones
+  @OneToMany(() => Product, (product) => product.user)
+  products: Product[];
 
   @OneToOne(() => Company, (company) => company.owner)
   company: Company;

@@ -14,8 +14,10 @@ import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { Product } from './entities/product.entity';
 import { PaginationDto } from 'src/common/dto/pagination.dto';
+import { Auth } from 'src/auth/decorators';
 
 @Controller('products')
+@Auth()
 export class ProductsController {
   constructor(private readonly productsService: ProductsService) {}
 
@@ -26,7 +28,6 @@ export class ProductsController {
 
   @Get()
   findAll(@Query() paginationDto: PaginationDto): Promise<Product[]> {
-    console.log('Pagination DTO:', paginationDto); // Log para verificar los valores recibidos
     return this.productsService.findAll(paginationDto);
   }
 

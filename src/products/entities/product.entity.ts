@@ -1,3 +1,4 @@
+import { User } from 'src/auth/entities/user.entity';
 import { Tax } from 'src/taxes/entities/tax.entity';
 import {
   Entity,
@@ -10,6 +11,7 @@ import {
   DeleteDateColumn,
   BeforeInsert,
   BeforeUpdate,
+  Index,
 } from 'typeorm';
 
 @Entity('products')
@@ -26,10 +28,15 @@ export class Product {
   @Column('text', { nullable: true })
   description: string;
 
-  // Relacionamos con la tabla Taxes
+  // Relaciones
   @ManyToOne(() => Tax, (tax) => tax.products, { eager: true })
   @JoinColumn({ name: 'taxId' })
   tax: Tax;
+
+  @Index()
+  @ManyToOne(() => User, (user) => user.products, { eager: true })
+  @JoinColumn({ name: 'created_by' }) // <-- Le decimos exactamente cómo llamar a la columna
+  user: User;
 
   @CreateDateColumn({ type: 'timestamptz' })
   createdAt: Date;
@@ -37,8 +44,8 @@ export class Product {
   @UpdateDateColumn({ type: 'timestamptz' })
   updatedAt: Date;
 
-  /* @Column({ type: 'uuid', name: 'created_by' })
-  createdBy: string; */
+  @Column({ type: 'uuid', name: 'created_by' })
+  createdBy: string;
 
   @Column({ type: 'uuid', name: 'updated_by', nullable: true })
   updatedBy: string;
