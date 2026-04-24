@@ -14,6 +14,7 @@ import { UpdateProductDto } from './dto/update-product.dto';
 import { PaginationDto } from 'src/common/dto/pagination.dto';
 import { User } from 'src/auth/entities/user.entity';
 import { PaginatedResponse } from 'src/interfaces/paginate-response.model';
+import { getTenantWhere } from 'src/common/utils/tenant.util';
 
 @Injectable()
 export class ProductsService {
@@ -86,10 +87,7 @@ export class ProductsService {
 
   async findOne(id: string, user: User): Promise<Product> {
     const product = await this.productRepository.findOne({
-      where: {
-        id: id,
-        user: { id: user.id },
-      },
+      where: getTenantWhere<Product>(user, { id }),
     });
     if (!product) {
       throw new NotFoundException(`El producto con ID ${id} no existe`);
@@ -108,9 +106,8 @@ export class ProductsService {
     const [products, total] = await this.productRepository.findAndCount({
       skip,
       take: limit,
-      where: {
-        user: { id: user.id },
-      },
+      // Magia pura: El helper decide si filtra por usuario o si lo trae todo (si es admin)
+      where: getTenantWhere<Product>(user),
       order: {
         createdAt: 'DESC', // Opcional: Para que salgan los más recientes primero
       },
