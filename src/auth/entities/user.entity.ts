@@ -12,6 +12,7 @@ import {
 import { UserRole } from '../enums/user-role.enum';
 import { Company } from 'src/company/entities/company.entity';
 import { Product } from 'src/products/entities/product.entity';
+import { Client } from 'src/clients/entities/client.entity';
 
 @Entity('users')
 export class User {
@@ -41,6 +42,9 @@ export class User {
   //relaciones
   @OneToMany(() => Product, (product) => product.user)
   products: Product[];
+
+  @OneToMany(() => Client, (client) => client.user)
+  clients: Client[];
 
   @OneToOne(() => Company, (company) => company.owner)
   company: Company;

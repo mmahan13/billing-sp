@@ -1,3 +1,4 @@
+import { User } from 'src/auth/entities/user.entity';
 import {
   Entity,
   Column,
@@ -7,6 +8,9 @@ import {
   DeleteDateColumn,
   BeforeInsert,
   BeforeUpdate,
+  Index,
+  ManyToOne,
+  JoinColumn,
 } from 'typeorm';
 
 @Entity('clients')
@@ -33,6 +37,12 @@ export class Client {
   @Column({ type: 'boolean', default: false })
   hasEquivalenceSurcharge: boolean;
 
+  //relaciones
+  @Index()
+  @ManyToOne(() => User, (user) => user.clients, { eager: true })
+  @JoinColumn({ name: 'created_by' }) // <-- Le decimos exactamente cómo llamar a la columna
+  user: User;
+
   // Fechas de auditoría (siempre vienen bien)
   @CreateDateColumn()
   createdAt: Date;
@@ -40,8 +50,8 @@ export class Client {
   @UpdateDateColumn()
   updatedAt: Date;
 
-  /* @Column({ type: 'uuid', name: 'created_by' })
-    createdBy: string; */
+  @Column({ type: 'uuid', name: 'created_by' })
+  createdBy: string;
 
   @Column({ type: 'uuid', name: 'updated_by', nullable: true })
   updatedBy: string;
