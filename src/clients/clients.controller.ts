@@ -29,7 +29,7 @@ export class ClientsController {
     return this.clientsService.findAll();
   }
 
-  @Auth(UserRole.ADMIN)
+  //@Auth(UserRole.ADMIN)
   @Get(':id')
   findOne(@Param('id', ParseUUIDPipe) id: string) {
     return this.clientsService.findOne(id);
