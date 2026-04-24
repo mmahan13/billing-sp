@@ -11,8 +11,11 @@ import {
 import { ClientsService } from './clients.service';
 import { CreateClientDto } from './dto/create-client.dto';
 import { UpdateClientDto } from './dto/update-client.dto';
+import { Auth } from 'src/auth/decorators';
+import { UserRole } from 'src/auth/enums/user-role.enum';
 
 @Controller('clients')
+@Auth()
 export class ClientsController {
   constructor(private readonly clientsService: ClientsService) {}
 
@@ -26,6 +29,7 @@ export class ClientsController {
     return this.clientsService.findAll();
   }
 
+  @Auth(UserRole.ADMIN)
   @Get(':id')
   findOne(@Param('id', ParseUUIDPipe) id: string) {
     return this.clientsService.findOne(id);
