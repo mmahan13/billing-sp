@@ -10,6 +10,7 @@ import { AuxiliaryModule } from './auxiliary/auxiliary.module';
 import { CommonModule } from './common/common.module';
 import { AuthModule } from './auth/auth.module';
 import { CompanyModule } from './company/company.module';
+import { SeedModule } from './seed/seed.module';
 
 @Module({
   imports: [
@@ -33,6 +34,7 @@ import { CompanyModule } from './company/company.module';
     CommonModule,
     AuthModule,
     CompanyModule,
+    SeedModule,
   ],
   controllers: [],
   providers: [],

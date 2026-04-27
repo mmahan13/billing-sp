@@ -1,0 +1,121 @@
+import { Injectable, Logger } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import * as bcrypt from 'bcrypt';
+
+import { User } from '../auth/entities/user.entity';
+import { Tax } from '../taxes/entities/tax.entity';
+import { Product } from '../products/entities/product.entity';
+import { Client } from '../clients/entities/client.entity';
+import { Company } from 'src/company/entities/company.entity';
+import {
+  SEED_CLIENTS,
+  SEED_COMPANY,
+  SEED_PRODUCTS,
+  SEED_TAXES,
+  SEED_USERS,
+} from './seed-data';
+
+// Importamos nuestros datos de prueba
+
+@Injectable()
+export class SeedService {
+  private readonly logger = new Logger('SeedService');
+
+  constructor(
+    @InjectRepository(User) private readonly userRepository: Repository<User>,
+    @InjectRepository(Company)
+    private readonly companyRepository: Repository<Company>,
+    @InjectRepository(Tax) private readonly taxRepository: Repository<Tax>,
+    @InjectRepository(Product)
+    private readonly productRepository: Repository<Product>,
+    @InjectRepository(Client)
+    private readonly clientRepository: Repository<Client>,
+  ) {}
+
+  async runSeed() {
+    this.logger.log('Iniciando proceso de Seed...');
+
+    await this.deleteDatabase();
+
+    // 1. Insertar Usuarios
+    const users = await this.insertUsers();
+    const manuelUser = users.find(
+      (u) => u.email === 'manuelfernandez@gmail.com',
+    );
+
+    // 2. Insertar Empresa (vinculada a Manuel)
+    await this.insertCompany(manuelUser!);
+
+    // 3. Insertar Impuestos
+    const taxes = await this.insertTaxes();
+
+    // 4. Insertar Productos y Clientes (vinculados a Manuel)
+    await this.insertProducts(manuelUser!, taxes);
+    await this.insertClients(manuelUser!);
+
+    this.logger.log('Seed ejecutado con éxito!');
+    return { message: 'Seed ejecutado con éxito' };
+  }
+
+  private async deleteDatabase() {
+    // Usamos QueryBuilder para saltarnos la protección de TypeORM contra borrados masivos
+    await this.productRepository.createQueryBuilder().delete().execute();
+    await this.clientRepository.createQueryBuilder().delete().execute();
+    await this.companyRepository.createQueryBuilder().delete().execute();
+
+    // Y luego los padres
+    await this.userRepository.createQueryBuilder().delete().execute();
+    await this.taxRepository.createQueryBuilder().delete().execute();
+
+    this.logger.log('Base de datos limpiada');
+  }
+
+  private async insertUsers(): Promise<User[]> {
+    const usersToInsert = SEED_USERS.map((user) => ({
+      ...user,
+      password: bcrypt.hashSync(user.password, 10),
+    }));
+
+    const users = this.userRepository.create(usersToInsert);
+    return await this.userRepository.save(users);
+  }
+
+  private async insertCompany(owner: User) {
+    const company = this.companyRepository.create({
+      ...SEED_COMPANY,
+      owner,
+    });
+    await this.companyRepository.save(company);
+  }
+
+  private async insertTaxes(): Promise<Tax[]> {
+    const taxes = this.taxRepository.create(SEED_TAXES);
+    return await this.taxRepository.save(taxes);
+  }
+
+  private async insertProducts(owner: User, taxes: Tax[]) {
+    const iva10 = taxes[1]; // IVA Reducido (10%)
+
+    // Mapeamos los productos base para inyectarles el usuario y el impuesto
+    const productsToInsert = SEED_PRODUCTS.map((product) => ({
+      ...product,
+      tax: iva10,
+      user: owner,
+    }));
+
+    const products = this.productRepository.create(productsToInsert);
+    await this.productRepository.save(products);
+  }
+
+  private async insertClients(owner: User) {
+    // Mapeamos los clientes para inyectarles el usuario dueño
+    const clientsToInsert = SEED_CLIENTS.map((client) => ({
+      ...client,
+      user: owner,
+    }));
+
+    const clients = this.clientRepository.create(clientsToInsert);
+    await this.clientRepository.save(clients);
+  }
+}
