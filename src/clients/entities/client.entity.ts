@@ -1,4 +1,6 @@
+import { Exclude } from 'class-transformer';
 import { User } from 'src/auth/entities/user.entity';
+import { Order } from 'src/orders/entities/order.entity';
 import {
   Entity,
   Column,
@@ -11,6 +13,7 @@ import {
   Index,
   ManyToOne,
   JoinColumn,
+  OneToMany,
 } from 'typeorm';
 
 @Entity('clients')
@@ -41,7 +44,11 @@ export class Client {
   @Index()
   @ManyToOne(() => User, (user) => user.clients, { eager: true })
   @JoinColumn({ name: 'created_by' }) // <-- Le decimos exactamente cómo llamar a la columna
+  @Exclude()
   user: User;
+
+  @OneToMany(() => Order, (order) => order.client)
+  orders: Order[];
 
   // Fechas de auditoría (siempre vienen bien)
   @CreateDateColumn()
