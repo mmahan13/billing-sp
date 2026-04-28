@@ -1,3 +1,4 @@
+import { Exclude } from 'class-transformer';
 import { User } from 'src/auth/entities/user.entity';
 import { Tax } from 'src/taxes/entities/tax.entity';
 import {
@@ -36,6 +37,7 @@ export class Product {
   @Index()
   @ManyToOne(() => User, (user) => user.products, { eager: true })
   @JoinColumn({ name: 'created_by' }) // <-- Le decimos exactamente cómo llamar a la columna
+  @Exclude()
   user: User;
 
   @CreateDateColumn({ type: 'timestamptz' })
