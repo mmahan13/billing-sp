@@ -11,6 +11,7 @@ import { CommonModule } from './common/common.module';
 import { AuthModule } from './auth/auth.module';
 import { CompanyModule } from './company/company.module';
 import { SeedModule } from './seed/seed.module';
+import { OrdersItemsModule } from './orders-items/orders-items.module';
 
 @Module({
   imports: [
@@ -35,6 +36,7 @@ import { SeedModule } from './seed/seed.module';
     AuthModule,
     CompanyModule,
     SeedModule,
+    OrdersItemsModule,
   ],
   controllers: [],
   providers: [],

@@ -13,6 +13,7 @@ import { UserRole } from '../enums/user-role.enum';
 import { Company } from 'src/company/entities/company.entity';
 import { Product } from 'src/products/entities/product.entity';
 import { Client } from 'src/clients/entities/client.entity';
+import { Order } from 'src/orders/entities/order.entity';
 
 @Entity('users')
 export class User {
@@ -48,6 +49,9 @@ export class User {
 
   @OneToOne(() => Company, (company) => company.owner)
   company: Company;
+
+  @OneToMany(() => Order, (order) => order.user)
+  orders: Order[];
 
   @CreateDateColumn({
     name: 'created_at',
