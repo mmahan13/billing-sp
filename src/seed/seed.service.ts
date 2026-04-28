@@ -15,6 +15,8 @@ import {
   SEED_TAXES,
   SEED_USERS,
 } from './seed-data';
+import { OrderItem } from 'src/orders-items/entities/orders-item.entity';
+import { Order } from 'src/orders/entities/order.entity';
 
 // Importamos nuestros datos de prueba
 
@@ -31,6 +33,10 @@ export class SeedService {
     private readonly productRepository: Repository<Product>,
     @InjectRepository(Client)
     private readonly clientRepository: Repository<Client>,
+    @InjectRepository(OrderItem)
+    private readonly orderItemRepository: Repository<OrderItem>,
+    @InjectRepository(Order)
+    private readonly orderRepository: Repository<Order>,
   ) {}
 
   async runSeed() {
@@ -59,12 +65,17 @@ export class SeedService {
   }
 
   private async deleteDatabase() {
-    // Usamos QueryBuilder para saltarnos la protección de TypeORM contra borrados masivos
+    // 1. Borramos el nivel más profundo (Las líneas de los pedidos)
+    await this.orderItemRepository.createQueryBuilder().delete().execute();
+    // 2. Borramos las cabeceras de los pedidos (Ya no tienen líneas)
+    await this.orderRepository.createQueryBuilder().delete().execute();
+
+    // 3. Borramos el catálogo y el negocio (Productos, Clientes, Empresas)
     await this.productRepository.createQueryBuilder().delete().execute();
     await this.clientRepository.createQueryBuilder().delete().execute();
     await this.companyRepository.createQueryBuilder().delete().execute();
 
-    // Y luego los padres
+    // 4. Por último, destruimos los cimientos (Usuarios e Impuestos)
     await this.userRepository.createQueryBuilder().delete().execute();
     await this.taxRepository.createQueryBuilder().delete().execute();
 

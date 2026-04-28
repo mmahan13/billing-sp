@@ -8,9 +8,21 @@ import { User } from 'src/auth/entities/user.entity';
 import { Tax } from 'src/taxes/entities/tax.entity';
 import { Product } from 'src/products/entities/product.entity';
 import { Client } from 'src/clients/entities/client.entity';
+import { OrderItem } from 'src/orders-items/entities/orders-item.entity';
+import { Order } from 'src/orders/entities/order.entity';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([User, Company, Tax, Product, Client])],
+  imports: [
+    TypeOrmModule.forFeature([
+      User,
+      Company,
+      Tax,
+      Product,
+      Client,
+      Order,
+      OrderItem,
+    ]),
+  ],
   controllers: [SeedController],
   providers: [SeedService],
 })
