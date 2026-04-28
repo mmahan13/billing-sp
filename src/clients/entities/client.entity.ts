@@ -21,7 +21,7 @@ export class Client {
   @Column({ type: 'varchar', length: 150 })
   businessName: string; // Nombre completo o Razón Social
 
-  @Column({ type: 'varchar', length: 9, unique: true, nullable: true })
+  @Column({ type: 'varchar', length: 9, unique: false, nullable: true })
   phone: string;
 
   @Column({ type: 'varchar', length: 20, unique: true })
