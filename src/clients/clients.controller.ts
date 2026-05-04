@@ -7,7 +7,8 @@ import {
   Param,
   Delete,
   ParseUUIDPipe,
-  Query,
+  ClassSerializerInterceptor,
+  UseInterceptors,
 } from '@nestjs/common';
 import { ClientsService } from './clients.service';
 import { CreateClientDto } from './dto/create-client.dto';
@@ -15,11 +16,10 @@ import { UpdateClientDto } from './dto/update-client.dto';
 import { Auth, GetUser } from 'src/auth/decorators';
 import { User } from 'src/auth/entities/user.entity';
 import { Client } from './entities/client.entity';
-import { PaginatedResponse } from 'src/interfaces/paginate-response.model';
-import { PaginationDto } from '../common/dto/pagination.dto';
 
 @Controller('clients')
 @Auth()
+@UseInterceptors(ClassSerializerInterceptor) //activa los excludes en product entity y client entity
 export class ClientsController {
   constructor(private readonly clientsService: ClientsService) {}
 
@@ -29,11 +29,8 @@ export class ClientsController {
   }
 
   @Get()
-  findAll(
-    @Query() paginationDto: PaginationDto,
-    @GetUser() user: User,
-  ): Promise<PaginatedResponse<Client>> {
-    return this.clientsService.findAll(paginationDto, user);
+  findAll(@GetUser() user: User): Promise<Client[]> {
+    return this.clientsService.findAll(user);
   }
 
   //@Auth(UserRole.ADMIN)

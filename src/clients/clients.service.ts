@@ -11,8 +11,6 @@ import { Client } from './entities/client.entity';
 import { CreateClientDto } from './dto/create-client.dto';
 import { UpdateClientDto } from './dto/update-client.dto';
 import { User } from 'src/auth/entities/user.entity';
-import { PaginatedResponse } from 'src/interfaces/paginate-response.model';
-import { PaginationDto } from 'src/common/dto/pagination.dto';
 import { getTenantWhere } from 'src/common/utils/tenant.util';
 
 @Injectable()
@@ -37,33 +35,20 @@ export class ClientsService {
     }
   }
 
-  async findAll(
-    paginationDto: PaginationDto,
-    user: User,
-  ): Promise<PaginatedResponse<Client>> {
-    const { page = 1, limit = 10 } = paginationDto;
-    const skip = (page - 1) * limit;
+  async findAll(user: User): Promise<Client[]> {
+    return await this.clientRepository
+      .createQueryBuilder('client')
+      // 1. Filtramos por el usuario logueado
+      .where('client.user = :userId', { userId: user.id })
 
-    const [clients, total] = await this.clientRepository.findAndCount({
-      skip,
-      take: limit,
-      // Magia pura: El helper decide si filtra por usuario o si lo trae todo (si es admin)
-      where: getTenantWhere<Client>(user),
-      order: {
-        createdAt: 'DESC',
-      },
-    });
+      // 2. Esta es la magia: cuenta las facturas y las mete en 'invoicesCount'
+      // 'client.invoices' debe ser el nombre de la relación @OneToMany
+      .loadRelationCountAndMap('client.invoicesCount', 'client.invoices')
 
-    return {
-      data: clients,
-      meta: {
-        totalItems: total,
-        itemCount: clients.length,
-        itemsPerPage: limit,
-        totalPages: Math.ceil(total / limit),
-        currentPage: page,
-      },
-    };
+      // 3. Ordenamos como tenías antes
+      .orderBy('client.createdAt', 'DESC')
+
+      .getMany();
   }
 
   async findOne(id: string, user: User): Promise<Client> {

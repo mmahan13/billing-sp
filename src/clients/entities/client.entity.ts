@@ -1,5 +1,6 @@
 import { Exclude } from 'class-transformer';
 import { User } from 'src/auth/entities/user.entity';
+import { Invoice } from 'src/invoices/entities/invoice.entity';
 import { Order } from 'src/orders/entities/order.entity';
 import {
   Entity,
@@ -49,6 +50,12 @@ export class Client {
 
   @OneToMany(() => Order, (order) => order.client)
   orders: Order[];
+
+  @OneToMany(() => Invoice, (invoice) => invoice.client)
+  invoices: Invoice[];
+
+  // Propiedad virtual (no se guarda en DB)
+  invoicesCount?: number;
 
   // Fechas de auditoría (siempre vienen bien)
   @CreateDateColumn()

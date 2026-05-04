@@ -6,10 +6,12 @@ import {
   OneToOne,
   JoinColumn,
   ManyToOne,
+  DeleteDateColumn,
 } from 'typeorm';
 import { Order } from '../../orders/entities/order.entity';
 import { User } from '../../auth/entities/user.entity';
 import { ColumnNumericTransformer } from '../../common/utils/numeric-transformer';
+import { Client } from 'src/clients/entities/client.entity';
 
 @Entity('invoices')
 export class Invoice {
@@ -32,6 +34,11 @@ export class Invoice {
   })
   totalAmount: number;
 
+  @ManyToOne(() => Client, (client) => client.invoices, {
+    nullable: false, // Una factura siempre debe tener un cliente
+  })
+  client: Client;
+
   @CreateDateColumn({ type: 'timestamp with time zone' })
   issueDate: Date;
 
@@ -43,4 +50,7 @@ export class Invoice {
   @ManyToOne(() => User, { nullable: false })
   @JoinColumn({ name: 'user_id' })
   user: User;
+
+  @DeleteDateColumn()
+  deletedAt: Date;
 }
