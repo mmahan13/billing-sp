@@ -8,6 +8,9 @@ import { User } from '../auth/entities/user.entity';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import timezone from 'dayjs/plugin/timezone';
+import { YearDto } from 'src/common/dto/year.dto';
+import { YearResult } from 'src/interfaces/year.model';
+import { calculateInvoiceSummary } from './utilities/calculate-invoice-summary';
 
 // Activamos los plugins
 dayjs.extend(utc);
@@ -36,6 +39,12 @@ export class InvoicesService {
   // Este método será llamado DESDE el OrdersService dentro de su transacción
   async createFromOrder(order: Order, user: User, queryRunner: QueryRunner) {
     const currentYear = new Date().getFullYear();
+    if (!order.client) {
+      // Si el pedido no trae el cliente, a veces es porque no se cargó la relación en el servicio de pedidos
+      throw new Error(
+        'El pedido debe tener un cliente asignado para generar la factura',
+      );
+    }
 
     // 1. Buscamos el número de la última factura de este usuario en este año
     const lastInvoice = await queryRunner.manager.findOne(Invoice, {
@@ -60,15 +69,23 @@ export class InvoicesService {
       totalAmount: order.totalAmount,
       order: order,
       user: user,
+      client: order.client,
     });
 
     return await queryRunner.manager.save(invoice);
   }
 
   // Listar todas las facturas del usuario (ordenadas de más nueva a más vieja)
-  async findAll(user: User) {
+  async findAll(user: User, yearDto?: YearDto) {
+    // Si yearDto no existe o yearDto.year es undefined, usamos el año actual.
+    const filterYear = yearDto?.year ?? new Date().getFullYear();
+    console.log('Año filtrado final:', filterYear);
+
     const invoices = await this.invoiceRepository.find({
-      where: { user: { id: user.id } },
+      where: {
+        user: { id: user.id },
+        year: filterYear, // Ahora filterYear es siempre un 'number'
+      },
       relations: ['order', 'order.client'],
       order: { issueDate: 'DESC' },
     });
@@ -76,31 +93,47 @@ export class InvoicesService {
     return invoices;
   }
 
+  async getAvailableYears(user: User): Promise<number[]> {
+    const result = await this.invoiceRepository
+      .createQueryBuilder('invoice')
+      .select('DISTINCT invoice.year', 'year')
+      .where('invoice.user = :userId', { userId: user.id })
+      .orderBy('year', 'DESC')
+      // 1. Le pasamos la interfaz al getRawMany
+      .getRawMany<YearResult>();
+
+    // 2. Ahora 'item' ya no es any, es de tipo YearResult
+    return result.map((item) => item.year);
+  }
+
   // Ver el detalle completo de una factura
   async findOne(id: string, user: User) {
     const invoice = await this.invoiceRepository.findOne({
-      where: {
-        id,
-        user: { id: user.id },
-      },
+      where: { id, user: { id: user.id } },
       relations: [
-        'user',
-        'user.company',
         'order',
         'order.client',
         'order.items',
         'order.items.product',
+        'user',
+        'user.company',
       ],
     });
 
     if (!invoice) {
-      throw new NotFoundException(`Factura con id ${id} no encontrada`);
+      throw new NotFoundException(`Factura con ID ${id} no encontrada`);
     }
 
-    return invoice;
+    // Calculamos el summary solo para esta factura
+    const summary = calculateInvoiceSummary(invoice.order.items);
+
+    return {
+      ...invoice,
+      summary,
+    };
   }
 
-  async getSalesTaxReport(year: number, user: User) {
+  /*  async getSalesTaxReport(year: number, user: User) {
     // 2. CREAMOS LAS FECHAS BASADAS EN LA HORA DE MADRID (No en UTC crudo)
     // Así el 1 de enero a las 00:00 de España será exacto.
     const startDate = dayjs.tz(`${year}-01-01 00:00:00`, TZ_SPAIN).toDate();
@@ -206,7 +239,7 @@ export class InvoicesService {
 
     return report;
   }
-
+ */
   async getTraceabilityData(year: number, user: User) {
     const startDate = dayjs.tz(`${year}-01-01 00:00:00`, TZ_SPAIN).toDate();
     const endDate = dayjs.tz(`${year}-12-31 23:59:59`, TZ_SPAIN).toDate();

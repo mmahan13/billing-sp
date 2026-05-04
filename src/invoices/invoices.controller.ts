@@ -3,18 +3,23 @@ import {
   Controller,
   Get,
   InternalServerErrorException,
+  NotFoundException,
   Param,
   ParseIntPipe,
   ParseUUIDPipe,
+  Query,
   Res,
   UseInterceptors,
 } from '@nestjs/common';
-import * as express from 'express';
+
 import { InvoicesService } from './invoices.service';
 import { GetUser } from '../auth/decorators/get-user.decorator';
 import { Auth } from 'src/auth/decorators';
 import { User } from 'src/auth/entities/user.entity';
 import { InvoicePdfService } from './invoice-pdf.service';
+import { YearDto } from 'src/common/dto/year.dto';
+import { InvoiceWithSummary } from './utilities/calculate-invoice-summary';
+import express from 'express';
 
 @Controller('invoices')
 @UseInterceptors(ClassSerializerInterceptor) //activa los excludes en product entity y client entity
@@ -26,8 +31,14 @@ export class InvoicesController {
 
   @Get()
   @Auth()
-  findAll(@GetUser() user: User) {
-    return this.invoicesService.findAll(user);
+  findAll(@GetUser() user: User, @Query() yearDto?: YearDto) {
+    return this.invoicesService.findAll(user, yearDto);
+  }
+
+  @Get('years')
+  @Auth()
+  getAvailableYears(@GetUser() user: User) {
+    return this.invoicesService.getAvailableYears(user);
   }
 
   @Get(':id')
@@ -41,31 +52,47 @@ export class InvoicesController {
   async getPdf(
     @Param('id', ParseUUIDPipe) id: string,
     @GetUser() user: User,
-    @Res() res: express.Response,
+    @Res() res: express.Response, // <--- Usamos el alias aquí
   ) {
     try {
-      const invoice = await this.invoicesService.findOne(id, user);
+      // 1. Obtenemos la factura "vitaminada" (ya trae el summary)
+      // Tipamos explícitamente para que el linter sepa qué estamos pasando al PDF
+      const invoice: InvoiceWithSummary = await this.invoicesService.findOne(
+        id,
+        user,
+      );
 
+      // 2. Generamos el buffer
       const buffer = await this.invoicePdfService.generatePdf(invoice);
 
-      // Una vez tenemos el buffer listo, preparamos las cabeceras
+      // 3. Configuramos las cabeceras
+      // Es buena práctica usar nombres de archivo limpios (sin espacios raros)
+      const fileName = invoice.invoiceNumber
+        .replace(/[^a-z0-9]/gi, '_')
+        .toLowerCase();
+
       res.set({
         'Content-Type': 'application/pdf',
-        'Content-Disposition': `attachment; filename="${invoice.invoiceNumber}.pdf"`,
+        'Content-Disposition': `attachment; filename="${fileName}.pdf"`,
         'Content-Length': buffer.length,
       });
 
-      // Y finalmente lo enviamos
+      // 4. Enviamos y cerramos
       res.end(buffer);
     } catch (error) {
-      console.error('PDF Error:', error);
+      // Si el error es un 404 (de findOne), lo dejamos pasar tal cual
+      if (error instanceof NotFoundException) {
+        throw error;
+      }
+
+      console.error('PDF Generation Error:', error);
       throw new InternalServerErrorException(
-        'No se pudo generar el PDF de la factura',
+        'Error interno al generar el documento PDF',
       );
     }
   }
 
-  @Get('reports/taxes/sales/:year')
+  /* @Get('reports/taxes/sales/:year')
   @Auth() // Protegido con JWT
   async getSalesTaxReport(
     @Param('year', ParseIntPipe) year: number,
@@ -84,7 +111,7 @@ export class InvoicesController {
         'Error al generar el informe de impuestos',
       );
     }
-  }
+  } */
 
   @Get('reports/traceability/data/:year')
   @Auth()

@@ -43,7 +43,6 @@ export class OrdersService {
       throw new NotFoundException(`Cliente con id ${clientId} no encontrado`);
     }
 
-    // --- INICIAMOS EL QUERY RUNNER ---
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
@@ -64,27 +63,35 @@ export class OrdersService {
           );
         }
 
+        // --- PASO 1: EXTRAER VALORES INDEPENDIENTES ---
         const priceAtTime = Number(product.basePrice);
-        const appliedTax = client.hasEquivalenceSurcharge
-          ? Number(product.tax.iva) + Number(product.tax.surcharge)
-          : Number(product.tax.iva);
+        const ivaAtTime = Number(product.tax.iva);
 
-        // Usamos el manager del queryRunner para crear la instancia
+        // Solo aplicamos recargo si el producto lo tiene Y el cliente está en ese régimen
+        const surchargeAtTime = client.hasEquivalenceSurcharge
+          ? Number(product.tax.surcharge)
+          : 0;
+
+        // --- PASO 2: CREAR EL ITEM CON EL DESGLOSE ---
         const orderItem = queryRunner.manager.create(OrderItem, {
           quantity: item.quantity,
           priceAtTime: priceAtTime,
-          taxAtTime: appliedTax,
+          ivaAtTime: ivaAtTime, // Columna nueva 1
+          surchargeAtTime: surchargeAtTime, // Columna nueva 2
           product: product,
         });
 
         orderItemsToInsert.push(orderItem);
 
-        const lineSubtotal =
-          priceAtTime * item.quantity * (1 + appliedTax / 100);
-        totalAmount += lineSubtotal;
+        // --- PASO 3: CÁLCULO DEL TOTAL DE LA LÍNEA ---
+        // Total = Base + IVA + Recargo
+        const baseLinea = priceAtTime * item.quantity;
+        const cuotaIva = baseLinea * (ivaAtTime / 100);
+        const cuotaRe = baseLinea * (surchargeAtTime / 100);
+
+        totalAmount += baseLinea + cuotaIva + cuotaRe;
       }
 
-      // Creamos la cabecera
       const order = queryRunner.manager.create(Order, {
         client,
         user,
@@ -92,21 +99,17 @@ export class OrdersService {
         items: orderItemsToInsert,
       });
 
-      // Guardamos la orden usando el manager de la transacción
       const savedOrder = await queryRunner.manager.save(order);
 
-      // Si todo ha ido bien, confirmamos los cambios en la base de datos
       await queryRunner.commitTransaction();
       return savedOrder;
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
     } catch (error) {
-      // Si algo falla (ej: la base de datos se cae a mitad), deshacemos todo
+      console.log(error);
       await queryRunner.rollbackTransaction();
       throw new InternalServerErrorException(
         'Error creando el pedido, transacción revertida.',
       );
     } finally {
-      // Siempre liberamos el queryRunner al terminar
       await queryRunner.release();
     }
   }
@@ -149,7 +152,7 @@ export class OrdersService {
     // 1. Buscamos el pedido (nos traemos las líneas y productos por si hay que tocar stock)
     const order = await this.orderRepository.findOne({
       where: { id, user: { id: user.id } },
-      relations: ['items', 'items.product'],
+      relations: ['items', 'items.product', 'client'],
     });
 
     if (!order) {

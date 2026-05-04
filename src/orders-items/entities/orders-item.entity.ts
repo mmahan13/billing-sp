@@ -18,7 +18,6 @@ export class OrderItem {
   @Column('int')
   quantity: number;
 
-  // --- SNAPSHOTS (Congelamos el precio y el IVA de este momento exacto) ---
   @Column('decimal', {
     precision: 10,
     scale: 2,
@@ -26,15 +25,28 @@ export class OrderItem {
   })
   priceAtTime: number;
 
+  // --- EL CAMBIO ESTÁ AQUÍ ---
+  // Guardamos el % de IVA que se aplicó en ese momento
   @Column('decimal', {
     precision: 5,
     scale: 2,
+    default: 0,
     transformer: new ColumnNumericTransformer(),
+    name: 'iva_at_time', // Nombre claro en BD
   })
-  taxAtTime: number;
+  ivaAtTime: number;
 
-  // --- RELACIONES ---
-  // Si se borra la orden, se borran sus líneas en cascada (onDelete: 'CASCADE')
+  // Guardamos el % de Recargo de Equivalencia (si el cliente lo tenía)
+  @Column('decimal', {
+    precision: 5,
+    scale: 2,
+    default: 0,
+    transformer: new ColumnNumericTransformer(),
+    name: 'surcharge_at_time',
+  })
+  surchargeAtTime: number;
+
+  // ... resto de relaciones igual
   @ManyToOne(() => Order, (order) => order.items, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'order_id' })
   order: Order;
