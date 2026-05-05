@@ -20,6 +20,7 @@ import { InvoicePdfService } from './invoice-pdf.service';
 import { YearDto } from 'src/common/dto/year.dto';
 import { InvoiceWithSummary } from './utilities/calculate-invoice-summary';
 import express from 'express';
+import { Invoice } from './entities/invoice.entity';
 
 @Controller('invoices')
 @UseInterceptors(ClassSerializerInterceptor) //activa los excludes en product entity y client entity
@@ -31,7 +32,10 @@ export class InvoicesController {
 
   @Get()
   @Auth()
-  findAll(@GetUser() user: User, @Query() yearDto?: YearDto) {
+  findAll(
+    @GetUser() user: User,
+    @Query() yearDto?: YearDto,
+  ): Promise<Invoice[]> {
     return this.invoicesService.findAll(user, yearDto);
   }
 

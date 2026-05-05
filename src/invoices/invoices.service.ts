@@ -76,10 +76,9 @@ export class InvoicesService {
   }
 
   // Listar todas las facturas del usuario (ordenadas de más nueva a más vieja)
-  async findAll(user: User, yearDto?: YearDto) {
+  async findAll(user: User, yearDto?: YearDto): Promise<Invoice[]> {
     // Si yearDto no existe o yearDto.year es undefined, usamos el año actual.
     const filterYear = yearDto?.year ?? new Date().getFullYear();
-    console.log('Año filtrado final:', filterYear);
 
     const invoices = await this.invoiceRepository.find({
       where: {
