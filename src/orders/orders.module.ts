@@ -8,10 +8,11 @@ import { Product } from 'src/products/entities/product.entity';
 import { Client } from 'src/clients/entities/client.entity';
 import { AuthModule } from 'src/auth/auth.module';
 import { InvoicesModule } from 'src/invoices/invoices.module';
+import { OrderPdfService } from './order-pdf.service';
 
 @Module({
   controllers: [OrdersController],
-  providers: [OrdersService],
+  providers: [OrdersService, OrderPdfService],
   imports: [
     // 1. Añadimos todas las entidades que el OrdersService inyecta vía @InjectRepository
     TypeOrmModule.forFeature([Order, OrderItem, Product, Client]),

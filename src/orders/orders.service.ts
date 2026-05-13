@@ -18,7 +18,9 @@ import { OrderStatus } from './enum/order-status.enum';
 import { InvoicesService } from 'src/invoices/invoices.service';
 import { YearResult } from 'src/interfaces/year.model';
 import { YearDto } from 'src/common/dto/year.dto';
-import { calculateInvoiceSummary } from 'src/invoices/utilities/calculate-invoice-summary';
+import { calculateDocumentSummary } from 'src/common/utilities/calculate-document-summary';
+import { OrderWithSummary } from './order-pdf.service';
+
 @Injectable()
 export class OrdersService {
   constructor(
@@ -206,11 +208,12 @@ export class OrdersService {
       throw new NotFoundException(`Pedido con id ${id} no encontrado`);
     }
 
+    const summary = calculateDocumentSummary(order.items);
     // Añadimos el objeto summary dinámicamente
     return {
       ...order,
-      summary: calculateInvoiceSummary(order.items),
-    };
+      summary,
+    } as OrderWithSummary;
   }
 
   async updateStatus(
@@ -289,5 +292,36 @@ export class OrdersService {
     } finally {
       await queryRunner.release();
     }
+  }
+
+  async getClientPriceHistory(clientId: string) {
+    // 1. Buscamos los últimos 5 pedidos de este cliente (con sus items)
+    const orders = await this.dataSource.manager.find(Order, {
+      where: { client: { id: clientId } },
+      relations: ['items', 'items.product'],
+      order: { orderDate: 'DESC' }, // Los más recientes primero
+      take: 5, // Miramos en los últimos 5 pedidos
+    });
+
+    // 2. Extraemos los productos únicos con su último precio
+    const historyMap = new Map();
+
+    for (const order of orders) {
+      for (const item of order.items) {
+        // Como vamos del pedido más nuevo al más viejo, el primero que encontremos es el más reciente
+        if (!historyMap.has(item.product.id)) {
+          historyMap.set(item.product.id, {
+            id: item.product.id,
+            productName: item.product.productName,
+            lastPrice: item.priceAtTime,
+            date: order.orderDate,
+          });
+        }
+      }
+    }
+
+    // Devolvemos solo la lista de los últimos 5 productos distintos comprados
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-return
+    return Array.from(historyMap.values()).slice(0, 5);
   }
 }

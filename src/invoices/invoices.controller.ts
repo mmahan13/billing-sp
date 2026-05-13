@@ -16,9 +16,8 @@ import { InvoicesService } from './invoices.service';
 import { GetUser } from '../auth/decorators/get-user.decorator';
 import { Auth } from 'src/auth/decorators';
 import { User } from 'src/auth/entities/user.entity';
-import { InvoicePdfService } from './invoice-pdf.service';
+import { InvoicePdfService, InvoiceWithSummary } from './invoice-pdf.service';
 import { YearDto } from 'src/common/dto/year.dto';
-import { InvoiceWithSummary } from './utilities/calculate-invoice-summary';
 import express from 'express';
 import { Invoice } from './entities/invoice.entity';
 

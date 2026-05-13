@@ -1,12 +1,14 @@
 import { Injectable } from '@nestjs/common';
 import PDFDocument from 'pdfkit';
 import { DocumentSummary } from 'src/common/utilities/calculate-document-summary';
-import { Invoice } from './entities/invoice.entity';
-export type InvoiceWithSummary = Invoice & { summary: DocumentSummary };
+import { Order } from './entities/order.entity';
+
+export type OrderWithSummary = Order & { summary: DocumentSummary };
 
 @Injectable()
-export class InvoicePdfService {
-  async generatePdf(invoice: InvoiceWithSummary): Promise<Buffer> {
+export class OrderPdfService {
+  async generatePdf(order: OrderWithSummary): Promise<Buffer> {
+    // Reemplaza 'any' por tu tipo OrderWithSummary
     return new Promise((resolve, reject) => {
       try {
         const doc = new PDFDocument({ margin: 50, size: 'A4' });
@@ -16,25 +18,25 @@ export class InvoicePdfService {
         doc.on('end', () => resolve(Buffer.concat(chunks)));
         doc.on('error', (err: Error) => reject(err));
 
-        // 1. Cabecera (Tipada)
-        this.drawHeader(doc, invoice);
+        // 1. Cabecera
+        this.drawHeader(doc, order);
 
         // 2. Datos del cliente
-        doc.font('Helvetica-Bold').fontSize(11).text('Facturar a:', 50, 155);
+        doc.font('Helvetica-Bold').fontSize(11).text('Presupuesto a:', 50, 155);
         doc
           .font('Helvetica')
           .fontSize(10)
-          .text(invoice.order.client.businessName, 50, 170)
-          .text(`NIF: ${invoice.order.client.taxId}`, 50, 185)
-          .text(invoice.order.client.address, 50, 200);
+          .text(order.client.businessName, 50, 170)
+          .text(`NIF: ${order.client.taxId}`, 50, 185)
+          .text(order.client.address, 50, 200);
 
         let currentY = 240;
         this.drawTableHeaders(doc, currentY);
         currentY += 25;
 
-        // 3. Filas de productos (Tipadas mediante la relación de Invoice)
+        // 3. Filas de productos
         doc.font('Helvetica').fontSize(10);
-        invoice.order.items.forEach((item) => {
+        order.items.forEach((item) => {
           const baseLinea = item.priceAtTime * item.quantity;
           const totalLinea =
             baseLinea * (1 + (item.ivaAtTime + item.surchargeAtTime) / 100);
@@ -72,7 +74,7 @@ export class InvoicePdfService {
 
         // 4. Bloque de impuestos y totales
         if (currentY > 640) doc.addPage();
-        this.drawFooter(doc, invoice);
+        this.drawFooter(doc, order);
 
         doc.end();
       } catch (error: unknown) {
@@ -81,24 +83,22 @@ export class InvoicePdfService {
     });
   }
 
-  // --- MÉTODOS PRIVADOS TIPADOS ---
+  // --- MÉTODOS PRIVADOS ---
 
-  private drawHeader(d: PDFKit.PDFDocument, inv: InvoiceWithSummary): void {
-    const company = inv.user.company;
-
-    d.font('Helvetica-Bold')
-      .fontSize(14)
-      .text(company?.businessName || 'Sabor a Miel S.L.', 50, 50);
+  private drawHeader(d: PDFKit.PDFDocument, order: OrderWithSummary): void {
+    // Si tienes los datos de la empresa en el payload del Order, cámbialo.
+    // Si no, pon los genéricos de Sabor a Miel.
+    d.font('Helvetica-Bold').fontSize(14).text('Sabor a Miel S.L.', 50, 50);
 
     d.font('Helvetica').fontSize(10);
-    d.text(`NIF: ${company?.taxId || 'B12345678'}`, 50, 68);
-    d.text(`Domicilio: ${company?.address || 'C/ Abejas 12, Mijas'}`, 50, 82);
-    d.text(`Teléfono: ${company?.phone || '600123456'}`, 50, 96);
-    d.text(`IBAN: ${company?.bankAccount || 'ES91...'}`, 50, 110);
+    d.text(`NIF: B12345678`, 50, 68);
+    d.text(`Domicilio: C/ Abejas 12, Mijas`, 50, 82);
+    d.text(`Teléfono: 600123456`, 50, 96);
 
     d.font('Helvetica-Bold')
       .fontSize(12)
-      .text(`FACTURA: ${inv.invoiceNumber}`, 300, 50, {
+      .text(`PRESUPUESTO: ${order.reference}`, 300, 50, {
+        // Usamos el campo reference (Ej: PR-2026-013)
         width: 250,
         align: 'right',
       });
@@ -106,7 +106,7 @@ export class InvoicePdfService {
     d.font('Helvetica')
       .fontSize(10)
       .text(
-        `Fecha: ${new Date(inv.issueDate).toLocaleDateString('es-ES')}`,
+        `Fecha: ${new Date(order.orderDate).toLocaleDateString('es-ES')}`,
         300,
         68,
         { width: 250, align: 'right' },
@@ -127,9 +127,9 @@ export class InvoicePdfService {
       .stroke();
   }
 
-  private drawFooter(doc: PDFKit.PDFDocument, inv: InvoiceWithSummary): void {
+  private drawFooter(doc: PDFKit.PDFDocument, order: OrderWithSummary): void {
     let summaryY = 680;
-    const hasRE = inv.summary.reTotal > 0;
+    const hasRE = order.summary.reTotal > 0;
 
     doc
       .moveTo(50, summaryY - 15)
@@ -152,7 +152,8 @@ export class InvoicePdfService {
     summaryY += 25;
 
     doc.font('Courier').fontSize(10);
-    inv.summary.taxGroups.forEach((group) => {
+    // Quitamos el ": any". Ahora TypeScript sabe que "group" es de tipo "TaxBreakdown"
+    order.summary.taxGroups.forEach((group) => {
       doc.text(`${group.base.toFixed(2)} €`, 50, summaryY, {
         width: 110,
         align: 'center',
@@ -186,7 +187,7 @@ export class InvoicePdfService {
     summaryY += 15;
     doc.font('Helvetica-Bold').fontSize(14);
     doc.text('TOTAL:', 200, summaryY, { width: 200, align: 'right' });
-    doc.text(`${inv.summary.totalFinal.toFixed(2)} €`, 420, summaryY, {
+    doc.text(`${order.summary.totalFinal.toFixed(2)} €`, 420, summaryY, {
       width: 130,
       align: 'right',
     });

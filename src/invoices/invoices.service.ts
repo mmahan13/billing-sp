@@ -10,7 +10,7 @@ import utc from 'dayjs/plugin/utc';
 import timezone from 'dayjs/plugin/timezone';
 import { YearDto } from 'src/common/dto/year.dto';
 import { YearResult } from 'src/interfaces/year.model';
-import { calculateInvoiceSummary } from './utilities/calculate-invoice-summary';
+import { calculateDocumentSummary } from 'src/common/utilities/calculate-document-summary';
 
 // Activamos los plugins
 dayjs.extend(utc);
@@ -124,7 +124,7 @@ export class InvoicesService {
     }
 
     // Calculamos el summary solo para esta factura
-    const summary = calculateInvoiceSummary(invoice.order.items);
+    const summary = calculateDocumentSummary(invoice.order.items);
 
     return {
       ...invoice,
