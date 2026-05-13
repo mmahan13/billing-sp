@@ -41,7 +41,7 @@ export class InvoicesController {
 
   @Get('years')
   @Auth()
-  getAvailableYears(@GetUser() user: User) {
+  getAvailableYears(@GetUser() user: User): Promise<number[]> {
     return this.invoicesService.getAvailableYears(user);
   }
 

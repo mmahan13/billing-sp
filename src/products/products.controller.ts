@@ -8,6 +8,8 @@ import {
   Delete,
   ParseUUIDPipe,
   Query,
+  UseInterceptors,
+  ClassSerializerInterceptor,
 } from '@nestjs/common';
 import { ProductsService } from './products.service';
 import { CreateProductDto } from './dto/create-product.dto';
@@ -20,6 +22,7 @@ import { PaginatedResponse } from 'src/interfaces/paginate-response.model';
 
 @Controller('products')
 @Auth()
+@UseInterceptors(ClassSerializerInterceptor)
 export class ProductsController {
   constructor(private readonly productsService: ProductsService) {}
 

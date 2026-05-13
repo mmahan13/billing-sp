@@ -1,4 +1,4 @@
-import { Exclude } from 'class-transformer';
+import { Exclude, Expose } from 'class-transformer';
 import { User } from 'src/auth/entities/user.entity';
 import { Tax } from 'src/taxes/entities/tax.entity';
 import {
@@ -23,7 +23,15 @@ export class Product {
   @Column('text', { name: 'product_name', nullable: false, unique: true })
   productName: string;
 
-  @Column('decimal', { precision: 10, scale: 2 })
+  @Column('decimal', {
+    precision: 10,
+    scale: 2,
+    // El transformer convierte el string de la DB a number de JS automáticamente
+    transformer: {
+      to: (value: number) => value,
+      from: (value: string) => parseFloat(value),
+    },
+  })
   basePrice: number;
 
   @Column('text', { nullable: true })
@@ -35,7 +43,7 @@ export class Product {
   tax: Tax;
 
   @Index()
-  @ManyToOne(() => User, (user) => user.products, { eager: true })
+  @ManyToOne(() => User, (user) => user.products, { eager: false })
   @JoinColumn({ name: 'created_by' }) // <-- Le decimos exactamente cómo llamar a la columna
   @Exclude()
   user: User;
@@ -62,5 +70,19 @@ export class Product {
     if (this.productName) {
       this.productName = this.productName.toUpperCase();
     }
+  }
+
+  @Expose() // Esto hace que 'pvp' aparezca en el JSON que recibe Angular
+  get pvp(): number {
+    if (!this.basePrice) return 0;
+
+    const iva = this.tax ? this.tax.iva / 100 : 0;
+    const re = this.tax && this.tax.surcharge ? this.tax.surcharge / 100 : 0;
+
+    const total = this.basePrice * (1 + iva + re);
+
+    // Redondeo matemático a 2 decimales para evitar el "5,225"
+    // Resultado: 5.23
+    return Math.round((total + Number.EPSILON) * 100) / 100;
   }
 }

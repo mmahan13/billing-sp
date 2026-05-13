@@ -7,6 +7,7 @@ import {
   ManyToOne,
   OneToMany,
   JoinColumn,
+  BeforeInsert,
 } from 'typeorm';
 
 import { User } from '../../auth/entities/user.entity';
@@ -35,6 +36,16 @@ export class Order {
     transformer: new ColumnNumericTransformer(),
   })
   totalAmount: number;
+
+  @Column({ type: 'int', nullable: true })
+  year: number; // Para facilitar filtros y estadísticas anuales
+
+  @Column({ type: 'int', nullable: true })
+  orderNumber: number; // El número secuencial dentro de ese año (ej: 1, 2, 3...)
+
+  // Opcional: Un campo para tener la referencia completa fácil (ej: PR-2026-001)
+  @Column({ nullable: true })
+  reference: string;
 
   @Column('timestamp with time zone', { default: () => 'CURRENT_TIMESTAMP' })
   orderDate: Date;
@@ -65,4 +76,13 @@ export class Order {
 
   @Column({ type: 'uuid', name: 'updated_by', nullable: true })
   updatedBy: string;
+
+  @BeforeInsert()
+  setYearAndNumber() {
+    if (this.orderDate) {
+      this.year = new Date(this.orderDate).getFullYear();
+    } else {
+      this.year = new Date().getFullYear();
+    }
+  }
 }

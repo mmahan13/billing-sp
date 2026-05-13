@@ -8,6 +8,7 @@ import {
   UseInterceptors,
   ClassSerializerInterceptor,
   Patch,
+  Query,
 } from '@nestjs/common';
 import { OrdersService } from './orders.service';
 import { CreateOrderDto } from './dto/create-order.dto';
@@ -15,6 +16,8 @@ import { Auth } from '../auth/decorators/auth.decorator';
 import { GetUser } from '../auth/decorators/get-user.decorator';
 import { User } from '../auth/entities/user.entity';
 import { UpdateOrderStatusDto } from './dto/update-order-status.dto';
+import { YearDto } from 'src/common/dto/year.dto';
+import { Order } from './entities/order.entity';
 
 @Controller('orders')
 @UseInterceptors(ClassSerializerInterceptor) //activa los excludes en product entity y client entity
@@ -31,6 +34,12 @@ export class OrdersController {
     return this.ordersService.create(createOrderDto, user);
   }
 
+  @Get('years')
+  @Auth()
+  getAvailableYears(@GetUser() user: User): Promise<number[]> {
+    return this.ordersService.getAvailableYears(user);
+  }
+
   @Get(':id')
   @Auth()
   findOne(@Param('id', ParseUUIDPipe) id: string, @GetUser() user: User) {
@@ -39,8 +48,8 @@ export class OrdersController {
 
   @Get()
   @Auth()
-  findAll(@GetUser() user: User) {
-    return this.ordersService.findAll(user);
+  findAll(@GetUser() user: User, @Query() yearDto?: YearDto): Promise<Order[]> {
+    return this.ordersService.findAll(user, yearDto);
   }
 
   @Patch(':id/status')

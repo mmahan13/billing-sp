@@ -16,6 +16,9 @@ import { OrderItem } from 'src/orders-items/entities/orders-item.entity';
 import { UpdateOrderStatusDto } from './dto/update-order-status.dto';
 import { OrderStatus } from './enum/order-status.enum';
 import { InvoicesService } from 'src/invoices/invoices.service';
+import { YearResult } from 'src/interfaces/year.model';
+import { YearDto } from 'src/common/dto/year.dto';
+import { calculateInvoiceSummary } from 'src/invoices/utilities/calculate-invoice-summary';
 @Injectable()
 export class OrdersService {
   constructor(
@@ -35,13 +38,8 @@ export class OrdersService {
   async create(createOrderDto: CreateOrderDto, user: User) {
     const { clientId, items } = createOrderDto;
 
-    const client = await this.clientRepository.findOne({
-      where: { id: clientId, user: { id: user.id } },
-    });
-
-    if (!client) {
-      throw new NotFoundException(`Cliente con id ${clientId} no encontrado`);
-    }
+    // 1. Validaciones previas (fuera de la transacción para no bloquear la DB)
+    const client = await this.validateClient(clientId, user.id);
 
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
@@ -50,46 +48,44 @@ export class OrdersService {
     try {
       let totalAmount = 0;
       const orderItemsToInsert: OrderItem[] = [];
+      const year = new Date().getFullYear();
+      // 1. Buscamos el último número de pedido de este usuario en el año actual
+      const lastOrder = await queryRunner.manager.findOne(Order, {
+        where: {
+          year: year,
+          user: { id: user.id },
+        },
+        order: { orderNumber: 'DESC' }, // Traemos el más alto
+      });
+
+      // 2. Calculamos el siguiente número
+      const nextNumber = lastOrder ? lastOrder.orderNumber + 1 : 1;
+
+      // 3. Generamos la referencia formateada (Ej: PR-2026-001)
+      // padStart añade ceros a la izquierda para que siempre tenga 3 dígitos
+      const reference = `PR-${year}-${String(nextNumber).padStart(3, '0')}`;
 
       for (const item of items) {
-        const product = await this.productRepository.findOne({
-          where: { id: item.productId, user: { id: user.id } },
-          relations: ['tax'],
-        });
+        const product = await this.validateProduct(item.productId, user.id);
 
-        if (!product) {
-          throw new BadRequestException(
-            `Producto con id ${item.productId} no válido`,
-          );
-        }
+        // --- LE PASAMOS EL PRECIO CUSTOM DE MANUEL ---
+        const lineDetails = this.calculateLineDetails(
+          product,
+          item.quantity,
+          item.price, // <--- NUEVO: Pasamos el precio del DTO
+          client.hasEquivalenceSurcharge,
+        );
 
-        // --- PASO 1: EXTRAER VALORES INDEPENDIENTES ---
-        const priceAtTime = Number(product.basePrice);
-        const ivaAtTime = Number(product.tax.iva);
-
-        // Solo aplicamos recargo si el producto lo tiene Y el cliente está en ese régimen
-        const surchargeAtTime = client.hasEquivalenceSurcharge
-          ? Number(product.tax.surcharge)
-          : 0;
-
-        // --- PASO 2: CREAR EL ITEM CON EL DESGLOSE ---
         const orderItem = queryRunner.manager.create(OrderItem, {
           quantity: item.quantity,
-          priceAtTime: priceAtTime,
-          ivaAtTime: ivaAtTime, // Columna nueva 1
-          surchargeAtTime: surchargeAtTime, // Columna nueva 2
+          priceAtTime: lineDetails.priceAtTime,
+          ivaAtTime: lineDetails.ivaAtTime,
+          surchargeAtTime: lineDetails.surchargeAtTime,
           product: product,
         });
 
         orderItemsToInsert.push(orderItem);
-
-        // --- PASO 3: CÁLCULO DEL TOTAL DE LA LÍNEA ---
-        // Total = Base + IVA + Recargo
-        const baseLinea = priceAtTime * item.quantity;
-        const cuotaIva = baseLinea * (ivaAtTime / 100);
-        const cuotaRe = baseLinea * (surchargeAtTime / 100);
-
-        totalAmount += baseLinea + cuotaIva + cuotaRe;
+        totalAmount += lineDetails.totalLinea;
       }
 
       const order = queryRunner.manager.create(Order, {
@@ -97,29 +93,100 @@ export class OrdersService {
         user,
         totalAmount: Number(totalAmount.toFixed(2)),
         items: orderItemsToInsert,
+        year: year,
+        orderNumber: nextNumber, // Guardamos el número (1, 2, 3...)
+        reference: reference,
       });
 
       const savedOrder = await queryRunner.manager.save(order);
-
       await queryRunner.commitTransaction();
       return savedOrder;
     } catch (error) {
-      console.log(error);
       await queryRunner.rollbackTransaction();
-      throw new InternalServerErrorException(
-        'Error creando el pedido, transacción revertida.',
-      );
+      throw error; // Re-lanzamos para que Nest gestione la respuesta
     } finally {
       await queryRunner.release();
     }
   }
 
-  async findAll(user: User) {
-    return await this.orderRepository.find({
-      where: { user: { id: user.id } },
-      relations: ['client'], // Traemos los datos del cliente para la vista de lista
-      order: { createdAt: 'DESC' }, // Los más recientes primero
+  // --- MÉTODOS PRIVADOS DE APOYO ---
+
+  private async validateClient(clientId: string, userId: string) {
+    const client = await this.clientRepository.findOne({
+      where: { id: clientId, user: { id: userId } },
     });
+    if (!client) throw new NotFoundException(`Cliente no encontrado`);
+    return client;
+  }
+
+  private async validateProduct(productId: string, userId: string) {
+    const product = await this.productRepository.findOne({
+      where: { id: productId, user: { id: userId } },
+      relations: ['tax'],
+    });
+    if (!product)
+      throw new BadRequestException(`Producto ${productId} no válido`);
+    return product;
+  }
+
+  private calculateLineDetails(
+    product: Product,
+    quantity: number,
+    customPrice: number, // <--- Este es el precio BASE (ej: 9€) que envía Angular
+    hasEquivalenceSurcharge: boolean,
+  ) {
+    // 1. Obtenemos los porcentajes
+    const ivaPercentage = product.tax ? product.tax.iva : 0;
+    const surchargePercentage =
+      product.tax && hasEquivalenceSurcharge ? product.tax.surcharge : 0;
+
+    // 2. EL PRECIO BASE YA ES EL QUE VIENE DEL FRONT (¡Sin fórmula inversa!)
+    const basePrice = customPrice;
+
+    // 3. Calculamos el subtotal de la línea (Base * Cantidad)
+    const subtotalBase = basePrice * quantity; // Ej: 9 * 10 = 90€
+
+    // 4. Calculamos los impuestos
+    const ivaAmount = subtotalBase * (ivaPercentage / 100); // Ej: 90 * 10% = 9€
+    const surchargeAmount = subtotalBase * (surchargePercentage / 100);
+
+    // 5. Sumamos todo para el total de la línea
+    const totalLinea = subtotalBase + ivaAmount + surchargeAmount; // Ej: 90 + 9 = 99€
+
+    return {
+      priceAtTime: Number(basePrice.toFixed(4)), // Guardamos los 9€ intactos
+      ivaAtTime: ivaPercentage,
+      surchargeAtTime: surchargePercentage,
+      totalLinea: totalLinea,
+    };
+  }
+  async findAll(user: User, yearDto?: YearDto): Promise<Order[]> {
+    // Si yearDto no existe o yearDto.year es undefined, usamos el año actual.
+    const filterYear = yearDto?.year ?? new Date().getFullYear();
+
+    const orders = await this.orderRepository.find({
+      where: {
+        user: { id: user.id },
+        year: filterYear, // Ahora filterYear es siempre un 'number'
+      },
+      relations: ['client'],
+      order: { createdAt: 'DESC' },
+    });
+
+    return orders;
+  }
+
+  async getAvailableYears(user: User): Promise<number[]> {
+    const result = await this.orderRepository
+      .createQueryBuilder('order')
+      .select('DISTINCT order.year', 'year')
+      .where('order.user = :userId', { userId: user.id })
+      .orderBy('year', 'DESC')
+      // 1. Le pasamos la interfaz al getRawMany
+      .getRawMany<YearResult>();
+
+    // 2. Ahora 'item' ya no es any, es de tipo YearResult
+    return result.map((item) => item.year);
   }
 
   async findOne(id: string, user: User) {
@@ -139,7 +206,11 @@ export class OrdersService {
       throw new NotFoundException(`Pedido con id ${id} no encontrado`);
     }
 
-    return order;
+    // Añadimos el objeto summary dinámicamente
+    return {
+      ...order,
+      summary: calculateInvoiceSummary(order.items),
+    };
   }
 
   async updateStatus(

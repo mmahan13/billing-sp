@@ -102,18 +102,14 @@ export class ProductsService {
     const { page = 1, limit = 10 } = paginationDto;
     const skip = (page - 1) * limit;
 
-    // findAndCount devuelve un array con 2 posiciones: [losDatos, elTotalDeRegistros]
     const [products, total] = await this.productRepository.findAndCount({
       skip,
       take: limit,
-      // Magia pura: El helper decide si filtra por usuario o si lo trae todo (si es admin)
       where: getTenantWhere<Product>(user),
-      order: {
-        createdAt: 'DESC', // Opcional: Para que salgan los más recientes primero
-      },
+      relations: ['tax'], // <--- Traemos el impuesto, pero NO el usuario
+      order: { productName: 'ASC' }, // Mejor ordenarlos por nombre para Manuel
     });
 
-    // Devolvemos un objeto con la metadata útil para el frontend
     return {
       data: products,
       meta: {
@@ -125,7 +121,6 @@ export class ProductsService {
       },
     };
   }
-
   async remove(id: string, user: User): Promise<void> {
     await this.findOne(id, user);
     await this.productRepository.softDelete(id);
