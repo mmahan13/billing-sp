@@ -34,6 +34,9 @@ export class Invoice {
   })
   totalAmount: number;
 
+  @Column('text', { nullable: true })
+  notes?: string;
+
   @ManyToOne(() => Client, (client) => client.invoices, {
     nullable: false, // Una factura siempre debe tener un cliente
   })

@@ -20,6 +20,7 @@ import { YearResult } from 'src/interfaces/year.model';
 import { YearDto } from 'src/common/dto/year.dto';
 import { calculateDocumentSummary } from 'src/common/utilities/calculate-document-summary';
 import { OrderWithSummary } from './order-pdf.service';
+import { Invoice } from 'src/invoices/entities/invoice.entity';
 
 @Injectable()
 export class OrdersService {
@@ -221,9 +222,9 @@ export class OrdersService {
     updateOrderStatusDto: UpdateOrderStatusDto,
     user: User,
   ) {
-    const { status } = updateOrderStatusDto;
+    const { status, notes } = updateOrderStatusDto;
 
-    // 1. Buscamos el pedido (nos traemos las líneas y productos por si hay que tocar stock)
+    // 1. Buscamos el pedido
     const order = await this.orderRepository.findOne({
       where: { id, user: { id: user.id } },
       relations: ['items', 'items.product', 'client'],
@@ -233,58 +234,79 @@ export class OrdersService {
       throw new NotFoundException(`Pedido con id ${id} no encontrado`);
     }
 
-    // --- REGLAS DE NEGOCIO ---
-    if (order.status === status) {
-      return order; // Si ya tiene ese estado, no hacemos nada
-    }
+    // --- REGLAS DE NEGOCIO BÁSICAS ---
+    if (order.status === status) return order;
 
     if (order.status === OrderStatus.PAID) {
       throw new BadRequestException(
-        'Un pedido ya pagado no puede cambiar de estado. Debe emitir un abono/devolución.',
+        'Un pedido ya pagado no puede cambiar de estado.',
       );
     }
 
     if (order.status === OrderStatus.CANCELLED) {
       throw new BadRequestException(
-        'No se puede reactivar un pedido cancelado. Cree uno nuevo.',
+        'No se puede reactivar un pedido cancelado.',
       );
     }
 
-    // --- TRANSACCIÓN SEGURA ---
+    if (order.status === OrderStatus.VOIDED) {
+      throw new BadRequestException(
+        'No se puede modificar una factura que ya ha sido anulada.',
+      );
+    }
+
+    // NUEVA REGLA: No puedes cobrar algo que no has facturado
+    if (status === OrderStatus.PAID && order.status === OrderStatus.PENDING) {
+      throw new BadRequestException(
+        'Debe emitir la factura (INVOICED) antes de poder cobrarla.',
+      );
+    }
+
+    // --- TRANSACCIÓN ---
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
 
     try {
-      // 2. Actualizamos la cabecera
+      // 2. Actualizamos el estado del pedido
       order.status = status;
       const updatedOrder = await queryRunner.manager.save(order);
 
-      // 3. Reacción en cadena si el pedido se confirma (PAID)
-      if (status === OrderStatus.PAID) {
-        // TODO: Módulo de Inventario -> Restar el stock de order.items
-        // ej: await this.inventoryService.deductStock(order.items, queryRunner);
+      // --- LA MAGIA ESTÁ AQUÍ ---
 
-        //Módulo de Facturación -> Crear el Invoice
-        await this.invoicesService.createFromOrder(
-          updatedOrder,
-          user,
-          queryRunner,
-        );
+      // CASO A: Manuel acaba de confirmar y emite la factura a 90 días
+      if (status === OrderStatus.INVOICED) {
+        // 1. Verificamos que no exista ya una factura (por seguridad)
+        const existingInvoice = await queryRunner.manager.findOne(Invoice, {
+          where: { order: { id: order.id } },
+        });
+
+        if (!existingInvoice) {
+          // 2. Creamos la factura pasándole la nota (ej: "Pago a 90 días")
+          await this.invoicesService.createFromOrder(
+            updatedOrder,
+            user,
+            queryRunner,
+            notes,
+          );
+        }
       }
 
-      // Si se cancela, también podríamos devolver stock si lo hubiéramos reservado previamente
-      if (status === OrderStatus.CANCELLED) {
-        // TODO: Lógica de cancelación
+      // CASO B: Manuel cobra 3 meses después
+      if (status === OrderStatus.PAID) {
+        // No hacemos NADA en Invoices.
+        // ¿Por qué? Porque la vista o frontend de Facturas mirará a invoice.order.status
+        // para pintar si está pagada o pendiente.
+        // TODO Futuro:
+        // - Apuntar el ingreso en un módulo de Contabilidad.
+        // - Enviar email automático de "Gracias por su pago" al cliente.
+        // - Aquí podrías restar el stock si decides hacerlo al cobrar y no al facturar.
       }
 
       await queryRunner.commitTransaction();
-
-      // Limpiamos el objeto antes de devolverlo (opcional, como hicimos en findOne)
       return updatedOrder;
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
     } catch (error) {
-      console.log('ERROR REAL:', error); // <--- AÑADE ESTO
+      console.log('ERROR REAL:', error);
       await queryRunner.rollbackTransaction();
       throw new InternalServerErrorException(
         'Error al cambiar el estado del pedido',

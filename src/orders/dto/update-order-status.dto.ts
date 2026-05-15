@@ -1,4 +1,4 @@
-import { IsEnum } from 'class-validator';
+import { IsEnum, IsOptional, IsString } from 'class-validator';
 import { OrderStatus } from '../enum/order-status.enum';
 
 export class UpdateOrderStatusDto {
@@ -6,4 +6,8 @@ export class UpdateOrderStatusDto {
     message: `El estado debe ser uno de los siguientes: ${Object.values(OrderStatus).join(', ')}`,
   })
   status: OrderStatus;
+
+  @IsString()
+  @IsOptional()
+  notes?: string;
 }

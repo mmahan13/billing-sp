@@ -37,7 +37,12 @@ export class InvoicesService {
   ) {}
 
   // Este método será llamado DESDE el OrdersService dentro de su transacción
-  async createFromOrder(order: Order, user: User, queryRunner: QueryRunner) {
+  async createFromOrder(
+    order: Order,
+    user: User,
+    queryRunner: QueryRunner,
+    notes?: string,
+  ): Promise<Invoice> {
     const currentYear = new Date().getFullYear();
     if (!order.client) {
       // Si el pedido no trae el cliente, a veces es porque no se cargó la relación en el servicio de pedidos
@@ -70,6 +75,7 @@ export class InvoicesService {
       order: order,
       user: user,
       client: order.client,
+      notes: notes,
     });
 
     return await queryRunner.manager.save(invoice);
